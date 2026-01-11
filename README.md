@@ -9,6 +9,9 @@ Realty Agent is an LLM-based chatbot designed to assist users with purchasing th
 ### Prerequisites
 - Python environment (version specified in `.python-version`)
 - OpenAI API key
+- Google Chrome browser installed
+
+**DISCLAIMER:** This setup was tested solely on a Apple Silicon Mac machine.
 
 ### Installation Steps
 
