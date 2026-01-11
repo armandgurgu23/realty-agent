@@ -1,5 +1,34 @@
 from openai import OpenAI
 import json
+from src.tool_handlers.property_search import get_properties_for_user
+
+def parse_xml_content(xml_string:str, tag_name:str) -> str | None:
+    """
+    Extract the content from an XML tag in a string.
+    
+    Args:
+        xml_string: String containing XML
+        tag_name: Name of the XML tag to extract content from
+    
+    Returns:
+        The content inside the XML tag, or None if tag not found
+    """
+    start_tag = f"<{tag_name}>"
+    end_tag = f"</{tag_name}>"
+    
+    start_index = xml_string.find(start_tag)
+    if start_index == -1:
+        return None
+    
+    # Move past the opening tag
+    content_start = start_index + len(start_tag)
+    
+    # Find the closing tag
+    end_index = xml_string.find(end_tag, content_start)
+    if end_index == -1:
+        return None
+    
+    return xml_string[content_start:end_index]
 
 class RealtyAgent(object):
     # TODO: Add a proper dataclass after.
@@ -10,6 +39,8 @@ class RealtyAgent(object):
         self.llm_client = llm_client
         self.model_snapshot = 'gpt-4.1-mini-2025-04-14'
         self.model_temperature = 0.0
+        # Just for troubleshooting purposes. Remember to set False when demo is finished.
+        self.debug_mode = True
 
 
     def get_agent_response(self, user_message:str, chat_history:list[dict], should_chat_end:bool):
@@ -18,6 +49,9 @@ class RealtyAgent(object):
         # print(should_chat_end)
         # TODO: Fill in logic with chatbot logic here. For now echoing back the user written message.
         oai_user_message = self.prepare_oai_user_message_from_history(chat_history, user_message)
+
+        if self.debug_mode:
+            print(oai_user_message)
 
         oai_messages = self.prepare_oai_messages(
             system_prompt_template=self.system_prompt_template,
@@ -34,15 +68,46 @@ class RealtyAgent(object):
 
         response = self.make_openai_request(oai_request_params)
 
+        if self.debug_mode:
+            print(f'Number of outputs in first OAI request: {len(response['output'])}')
+            print(response['output'])
 
-        if len(response['output']) == 1 and response['output'][0]['type'] == 'message':
-            agent_message, should_chat_end = self.parse_chat_message_from_output(response['output'][0])
-        else:
-            # We received a tool call so we need to execute the tool and then make another
-            # LLM request to interpret tool outputs.
-            breakpoint()
+
+        for curr_item in response['output']:
+            if curr_item['type'] == 'message':
+                agent_message, should_chat_end = self.parse_chat_message_from_output(response['output'][0])
+            elif curr_item['type'] == 'function_call' and curr_item['name'] == 'get_properties_for_user':
+                function_arguments = json.loads(curr_item['arguments'])
+                available_listings = get_properties_for_user(**function_arguments)
+                updated_oai_messages = self.update_messages_with_tool_information(
+                    tool_input=curr_item,
+                    tool_output={
+                        "type": "function_call_output",
+                        "call_id": curr_item['call_id'],
+                        "output": available_listings
+                    },
+                    oai_messages=oai_request_params['input']
+                )
+                # Now carry out the OAI request to generate response based on tool call output.
+                oai_request_params["input"] = updated_oai_messages
+                new_response = self.make_openai_request(oai_request_params)
+                if self.debug_mode:
+                    print(f'Number of outputs in second OAI request: {len(response['output'])}')
+                    print(response['output'])
+                agent_message, should_chat_end = self.parse_chat_message_from_output(new_response['output'][0])
+            else:
+                breakpoint()
+                if self.debug_mode:
+                    print('Unexpected output item type! Inspect it!')
 
         return f"{agent_message}", should_chat_end
+    
+    def update_messages_with_tool_information(self, tool_input:dict, tool_output:dict, oai_messages):
+        user_message = oai_messages[-1]['content']
+        transcript_text = parse_xml_content(user_message, 'history')
+        transcript_text += f"BOT: {tool_input}\nBOT:{tool_output}\n"
+        oai_messages[-1]['content'] = transcript_text
+        return oai_messages
     
     def parse_chat_message_from_output(self, output_message):
         try:
@@ -53,7 +118,23 @@ class RealtyAgent(object):
     
     
     def prepare_tool_definitions(self):
-        return None
+        return [
+            {
+                'type': "function",
+                'name': 'get_properties_for_user',
+                "description": "Use this tool to find properties for sale or for rent when the user mentions that they are interested to move.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "neighbourhood": {
+                            "type": "string",
+                            "description": "A neighbourhood where the user may be interested to move in to."
+                        }
+                    },
+                    "required": ["neighbourhood"]
+                }
+            }
+        ]
     
     def prepare_response_schema(self):
         return {
@@ -93,10 +174,14 @@ class RealtyAgent(object):
         
         if not transcript:
             # This is a multi-turn transcript, need to combine chat history with latest user message.
-            breakpoint()
-            print('Handle multi-turn.')
+            transcript = '\n'.join([f"{curr_turn['role']}: {curr_turn['content']}" for curr_turn in chat_history])
+            # Make sure to add the incoming current message as well.
+            transcript += f'\nUSER: {user_message}'
 
         formatted_user_message = self.user_prompt_template.replace('{history}', transcript)
+        # NOTE: In a production setting a multi-turn transcript can get quite lengthy in terms of input tokens,
+        # So you would likely want to apply some transcript context management compression here if
+        # we get close to eating up the context window of the LLM. For now I'm omitting handling this situation.
         return formatted_user_message
     
     

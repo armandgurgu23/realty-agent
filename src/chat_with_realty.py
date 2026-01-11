@@ -22,6 +22,21 @@ def welcome_realty():
 ╚═══════════════════════════════════════════════════════════╝
     """)
 
+def goodbye_realty():
+    """Custom goodbye screen for Realty chatbot"""
+    print("""
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   ██████╗ ██╗   ██╗███████╗                              ║
+║   ██╔══██╗╚██╗ ██╔╝██╔════╝                              ║
+║   ██████╔╝ ╚████╔╝ █████╗                                ║
+║   ██╔══██╗  ╚██╔╝  ██╔══╝                                ║
+║   ██████╔╝   ██║   ███████╗                              ║
+║   ╚═════╝    ╚═╝   ╚══════╝                              ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+    """)
+
 def get_user_input():
     user_input = input("User: ")
     return user_input
@@ -58,11 +73,12 @@ def main():
 
         print(f'Realty: {agent_response}')
 
-        if agent_response == 'quit':
-            should_chat_end = True
-
+        # Update conversation state because one turn has completed.
+        chat_history.append({'role': 'USER', 'content': curr_user_turn})
+        chat_history.append({'role': 'BOT', 'content': agent_response})
 
     print('\n\nEXITING CHAT WITH REALTY.\n\n')
+    goodbye_realty()
 
 
 
