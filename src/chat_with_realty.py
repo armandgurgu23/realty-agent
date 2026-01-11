@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 from src.prompts.realty_v1 import SYSTEM_PROMPT, USER_PROMPT
 from src.chat_handlers.realty_handler import RealtyAgent
+from openai import OpenAI
+from os import environ
 
 def welcome_realty():
     """Custom welcome screen for Realty chatbot"""
@@ -26,6 +28,9 @@ def get_user_input():
 
 
 def main():
+
+    # We want code to fail loudly if API key is not set.
+    llm_client = OpenAI(api_key=environ['OPENAI_API_KEY'])
      
     welcome_realty()
 
@@ -36,7 +41,8 @@ def main():
 
     re_agent = RealtyAgent(
         system_prompt_template=SYSTEM_PROMPT,
-        user_prompt_template=USER_PROMPT
+        user_prompt_template=USER_PROMPT,
+        llm_client=llm_client
     )
 
     while not should_chat_end:
