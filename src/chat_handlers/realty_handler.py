@@ -1,37 +1,12 @@
 from openai import OpenAI
 import json
 from src.tool_handlers.property_search import get_properties_for_user
+from src.utils.oai_utils import make_openai_request
+from src.utils.general_utils import parse_xml_content
 
-def parse_xml_content(xml_string:str, tag_name:str) -> str | None:
-    """
-    Extract the content from an XML tag in a string.
-    
-    Args:
-        xml_string: String containing XML
-        tag_name: Name of the XML tag to extract content from
-    
-    Returns:
-        The content inside the XML tag, or None if tag not found
-    """
-    start_tag = f"<{tag_name}>"
-    end_tag = f"</{tag_name}>"
-    
-    start_index = xml_string.find(start_tag)
-    if start_index == -1:
-        return None
-    
-    # Move past the opening tag
-    content_start = start_index + len(start_tag)
-    
-    # Find the closing tag
-    end_index = xml_string.find(end_tag, content_start)
-    if end_index == -1:
-        return None
-    
-    return xml_string[content_start:end_index]
 
 class RealtyAgent(object):
-    # TODO: Add a proper dataclass after.
+    
     def __init__(self, system_prompt_template:str, user_prompt_template:str, llm_client:OpenAI):
         self.system_prompt_template = system_prompt_template
         self.user_prompt_template = user_prompt_template
@@ -44,10 +19,7 @@ class RealtyAgent(object):
 
 
     def get_agent_response(self, user_message:str, chat_history:list[dict], should_chat_end:bool):
-        # print(user_message)
-        # print(chat_history)
-        # print(should_chat_end)
-        # TODO: Fill in logic with chatbot logic here. For now echoing back the user written message.
+        
         oai_user_message = self.prepare_oai_user_message_from_history(chat_history, user_message)
 
         if self.debug_mode:
@@ -66,7 +38,7 @@ class RealtyAgent(object):
             'text': { "format": self.prepare_response_schema()}
         }
 
-        response = self.make_openai_request(oai_request_params)
+        response = make_openai_request(oai_request_params, self.llm_client)
 
         if self.debug_mode:
             print(f'Number of outputs in first OAI request: {len(response['output'])}')
@@ -78,6 +50,7 @@ class RealtyAgent(object):
                 agent_message, should_chat_end = self.parse_chat_message_from_output(response['output'][0])
             elif curr_item['type'] == 'function_call' and curr_item['name'] == 'get_properties_for_user':
                 function_arguments = json.loads(curr_item['arguments'])
+                function_arguments.update({'llm_client': self.llm_client})
                 available_listings = get_properties_for_user(**function_arguments)
                 updated_oai_messages = self.update_messages_with_tool_information(
                     tool_input=curr_item,
@@ -90,7 +63,7 @@ class RealtyAgent(object):
                 )
                 # Now carry out the OAI request to generate response based on tool call output.
                 oai_request_params["input"] = updated_oai_messages
-                new_response = self.make_openai_request(oai_request_params)
+                new_response = make_openai_request(oai_request_params, self.llm_client)
                 if self.debug_mode:
                     print(f'Number of outputs in second OAI request: {len(new_response['output'])}')
                     print(new_response['output'])
@@ -184,12 +157,3 @@ class RealtyAgent(object):
         # we get close to eating up the context window of the LLM. For now I'm omitting handling this situation.
         return formatted_user_message
     
-    
-    def make_openai_request(self, request_params:dict):
-        response = self.llm_client.responses.create(
-            **request_params
-        )
-        if response.status == 'completed':
-            return response.model_dump()
-        else:
-            raise RuntimeError(f'Response.status is not completed! Response object below: \n\n{response}\n\n')

@@ -49,7 +49,6 @@ def main():
      
     welcome_realty()
 
-    # TODO: Update chat_ended to be dynamically set by Realty's decision.
     should_chat_end = False
 
     chat_history = []
@@ -62,8 +61,6 @@ def main():
 
     while not should_chat_end:
         curr_user_turn = get_user_input()
-
-        # TODO: remove later, for now simulating exitting chat.
 
         agent_response, should_chat_end = re_agent.get_agent_response(
             user_message=curr_user_turn,
