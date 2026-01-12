@@ -2,7 +2,7 @@
 
 ## Overview
 
-Realty Agent is an LLM-based chatbot designed to assist users with purchasing their dream home. The project leverages OpenAI's LLMs (specifically gpt-4.1-mini) to create an interactive conversational agent specialized in real estate assistance.
+Realty Agent is an LLM-based chatbot designed to assist users with researching their next home. The project leverages OpenAI's LLMs (specifically gpt-4.1-mini) to create an interactive conversational agent specialized in real estate assistance.
 
 ## Setup Instructions
 
