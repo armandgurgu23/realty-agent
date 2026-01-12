@@ -48,26 +48,11 @@ class RealtyAgent(object):
         for curr_item in response['output']:
             if curr_item['type'] == 'message':
                 agent_message, should_chat_end = self.parse_chat_message_from_output(response['output'][0])
-            elif curr_item['type'] == 'function_call' and curr_item['name'] == 'get_listings_for_neighbourhood':
-                function_arguments = json.loads(curr_item['arguments'])
-                function_arguments.update({'llm_client': self.llm_client})
-                available_listings = get_listings_for_neighbourhood(**function_arguments)
-                updated_oai_messages = self.update_messages_with_tool_information(
-                    tool_input=curr_item,
-                    tool_output={
-                        "type": "function_call_output",
-                        "call_id": curr_item['call_id'],
-                        "output": available_listings
-                    },
-                    oai_messages=oai_request_params['input']
+            elif curr_item['type'] == 'function_call':
+                agent_message, should_chat_end = self.handle_tool_call_execution(
+                    curr_item, 
+                    oai_request_params
                 )
-                # Now carry out the OAI request to generate response based on tool call output.
-                oai_request_params["input"] = updated_oai_messages
-                new_response = make_openai_request(oai_request_params, self.llm_client)
-                if self.debug_mode:
-                    print(f'Number of outputs in second OAI request: {len(new_response['output'])}')
-                    print(new_response['output'])
-                agent_message, should_chat_end = self.parse_chat_message_from_output(new_response['output'][0])
             else:
                 breakpoint()
                 if self.debug_mode:
@@ -75,7 +60,56 @@ class RealtyAgent(object):
 
         return f"{agent_message}", should_chat_end
     
-    def update_messages_with_tool_information(self, tool_input:dict, tool_output:dict, oai_messages):
+
+    def handle_tool_call_execution(self, tool_call_item:dict, oai_request_params:dict):
+        """
+        Handle the execution of a tool call and generate a response based on the tool output.
+        
+        Args:
+            tool_call_item: The tool call item from the API response
+            oai_request_params: The original OAI request parameters
+            
+        Returns:
+            tuple: (agent_message, should_chat_end)
+        """
+        tool_name = tool_call_item['name']
+        function_arguments = json.loads(tool_call_item['arguments'])
+        
+        # Execute the appropriate tool based on tool_name
+        if tool_name == 'get_listings_for_neighbourhood':
+            function_arguments.update({'llm_client': self.llm_client})
+            tool_output = get_listings_for_neighbourhood(**function_arguments)
+        elif tool_name == 'get_points_of_interest_for_listing':
+            function_arguments.update({'llm_client': self.llm_client})
+            tool_output = get_points_of_interest_for_listing(**function_arguments)
+        else:
+            raise ValueError(f"Unknown tool name: {tool_name}")
+        
+        # Update messages with tool information
+        updated_oai_messages = self.update_messages_with_tool_information(
+            tool_input=tool_call_item,
+            tool_output={
+                "type": "function_call_output",
+                "call_id": tool_call_item['call_id'],
+                "output": tool_output
+            },
+            oai_messages=oai_request_params['input']
+        )
+        
+        # Generate response based on tool call output
+        oai_request_params["input"] = updated_oai_messages
+        new_response = make_openai_request(oai_request_params, self.llm_client)
+        
+        if self.debug_mode:
+            print(f'Number of outputs in second OAI request: {len(new_response['output'])}')
+            print(new_response['output'])
+        
+        agent_message, should_chat_end = self.parse_chat_message_from_output(new_response['output'][0])
+        
+        return agent_message, should_chat_end
+
+    
+    def update_messages_with_tool_information(self, tool_input:dict, tool_output:dict, oai_messages:list[dict]):
         user_message = oai_messages[-1]['content']
         transcript_text = parse_xml_content(user_message, 'history')
         transcript_text += f"BOT: {tool_input}\nBOT:{tool_output}\n"
@@ -93,8 +127,8 @@ class RealtyAgent(object):
     def prepare_tool_definitions(self):
         return [
             {
-                'type': "function",
-                'name': 'get_listings_for_neighbourhood',
+                "type": "function",
+                "name": "get_listings_for_neighbourhood",
                 "description": "Use this tool to find listings for sale or for rent when the user mentions that they are interested to move.",
                 "parameters": {
                     "type": "object",
@@ -105,6 +139,21 @@ class RealtyAgent(object):
                         }
                     },
                     "required": ["neighbourhood"]
+                }
+            },
+            {
+                "type": "function",
+                "name": "get_points_of_interest_for_listing",
+                "description": "Use this tool when a user wants to know about local facilities or points of interest for a given listing address.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "listing_address": {
+                            "type": "string",
+                            "description": "A single listing address represented as [unit/house #] - [street address]"
+                        }
+                    },
+                    "required": ["listing_address"]
                 }
             }
         ]
@@ -154,6 +203,5 @@ class RealtyAgent(object):
         formatted_user_message = self.user_prompt_template.replace('{history}', transcript)
         # NOTE: In a production setting a multi-turn transcript can get quite lengthy in terms of input tokens,
         # So you would likely want to apply some transcript context management compression here if
-        # we get close to eating up the context window of the LLM. For now I'm omitting handling this situation.
+        # we get close to eating up the context window of the LLM.
         return formatted_user_message
-    
