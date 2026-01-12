@@ -40,7 +40,7 @@ class RealtyAgent(object):
         self.model_snapshot = 'gpt-4.1-mini-2025-04-14'
         self.model_temperature = 0.0
         # Just for troubleshooting purposes. Remember to set False when demo is finished.
-        self.debug_mode = True
+        self.debug_mode = False
 
 
     def get_agent_response(self, user_message:str, chat_history:list[dict], should_chat_end:bool):
@@ -92,8 +92,8 @@ class RealtyAgent(object):
                 oai_request_params["input"] = updated_oai_messages
                 new_response = self.make_openai_request(oai_request_params)
                 if self.debug_mode:
-                    print(f'Number of outputs in second OAI request: {len(response['output'])}')
-                    print(response['output'])
+                    print(f'Number of outputs in second OAI request: {len(new_response['output'])}')
+                    print(new_response['output'])
                 agent_message, should_chat_end = self.parse_chat_message_from_output(new_response['output'][0])
             else:
                 breakpoint()
