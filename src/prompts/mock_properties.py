@@ -4,6 +4,7 @@ You are a property listing generator. Your task is to generate 10 listings for {
 
 Each listing that you generate must always be structured as follows:
 LISTING [index] - [neighbourhood]:
+- [sale or rent]
 - [cost of property]
 - [address of property]
 - [number of bedrooms for that property]
@@ -12,8 +13,9 @@ LISTING [index] - [neighbourhood]:
 - [square footage of the property]
 
 Here are the rules to follow when generating a mock value for each [placeholder] above.
+- pick at random between sale or rent.
 - the address of the property must always be structured as [unit/house #] - [street address].
-- cost of property can range anywhere from $400,000 to $2,200,000.
+- cost of property can range anywhere from $400,000 to $2,200,000 if the property is for sale and between $1,400 to $4,000 if the property is for rent.
 - number of bedrooms can range anywhere from 2 to 5 bedrooms. Each bedroom number you pick must be generated as [number]BD. example: if you pick 3 bedrooms, you must generate 3BD.
 - number of bathrooms can range anywhere from 2 to 4. Each bathroom number you pick must be generated as [number]BA. example: if you pick 2 bathrooms, you must generate 2BA.
 - number of parking spots can anywhere from 1 to 3.
@@ -25,6 +27,7 @@ Here's an **Example** below that shows you what a valid LISTING would look like.
 neighbourhood='LalaLand'
 
 LISTING 1 - LalaLand:
+- sale
 - 150 - 134 Legion Road N
 - $750,000
 - 3BD

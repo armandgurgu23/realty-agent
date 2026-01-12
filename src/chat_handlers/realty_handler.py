@@ -1,6 +1,6 @@
 from openai import OpenAI
 import json
-from src.tool_handlers.property_search import get_properties_for_user
+from src.tool_handlers.property_search import get_listings_for_neighbourhood, get_points_of_interest_for_listing
 from src.utils.oai_utils import make_openai_request
 from src.utils.general_utils import parse_xml_content
 
@@ -48,10 +48,10 @@ class RealtyAgent(object):
         for curr_item in response['output']:
             if curr_item['type'] == 'message':
                 agent_message, should_chat_end = self.parse_chat_message_from_output(response['output'][0])
-            elif curr_item['type'] == 'function_call' and curr_item['name'] == 'get_properties_for_user':
+            elif curr_item['type'] == 'function_call' and curr_item['name'] == 'get_listings_for_neighbourhood':
                 function_arguments = json.loads(curr_item['arguments'])
                 function_arguments.update({'llm_client': self.llm_client})
-                available_listings = get_properties_for_user(**function_arguments)
+                available_listings = get_listings_for_neighbourhood(**function_arguments)
                 updated_oai_messages = self.update_messages_with_tool_information(
                     tool_input=curr_item,
                     tool_output={
@@ -94,8 +94,8 @@ class RealtyAgent(object):
         return [
             {
                 'type': "function",
-                'name': 'get_properties_for_user',
-                "description": "Use this tool to find properties for sale or for rent when the user mentions that they are interested to move.",
+                'name': 'get_listings_for_neighbourhood',
+                "description": "Use this tool to find listings for sale or for rent when the user mentions that they are interested to move.",
                 "parameters": {
                     "type": "object",
                     "properties": {
