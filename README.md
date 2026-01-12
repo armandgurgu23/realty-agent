@@ -23,7 +23,7 @@ Create a `.env` file in the root of the repository and fill out the required cre
 cp -r .env.example .env
 ```
 
-After copying, edit the `.env` file to add your OpenAI API key and any other required credentials.
+After copying, edit the `.env` file to add your OpenAI API key.
 
 **Step 2: Run the Application**
 
